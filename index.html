@@ -836,6 +836,7 @@ function buildUI() {
     <p class="section-title">Filtros</p>
     ${buildFilters()}
     <p class="section-title">Visão Geral</p>
+    <div id="valorBanner"></div>
     <div class="kpi-grid" id="kpiGrid"></div>
     <p class="section-title">Efetividade por Vendedor</p>
     <div class="efectividade-section">
@@ -873,7 +874,7 @@ function buildUI() {
   });
 
   // Aguarda o navegador processar o novo innerHTML antes de popular os elementos
-  setTimeout(updateUI, 50);
+  setTimeout(updateUI, 200);
 }
 
 // Atualiza KPIs, tabela, gráficos e insights com os dados filtrados
