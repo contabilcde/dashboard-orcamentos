@@ -601,46 +601,36 @@ async function loadData() {
   btn.classList.add('loading');
 
   try {
-    // Tenta múltiplos proxies em sequência para contornar CORS no Google Sites
     const csvTarget = CSV_URL + '&_t=' + Date.now();
-    const proxies = [
-      {
-        type: 'allorigins',
-        url: () => `https://api.allorigins.win/get?url=${encodeURIComponent(csvTarget)}`,
-        extract: async (res) => { const j = await res.json(); return j.contents; }
-      },
-      {
-        type: 'corsproxy',
-        url: () => `https://corsproxy.io/?${encodeURIComponent(csvTarget)}`,
-        extract: async (res) => res.text()
-      },
-      {
-        type: 'jsonp-allorigins',
-        url: () => `https://api.allorigins.win/raw?url=${encodeURIComponent(csvTarget)}`,
-        extract: async (res) => res.text()
-      }
-    ];
 
     const fetchWithTimeout = (url, ms) => Promise.race([
       fetch(url),
       new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
     ]);
 
+    const isValidCSV = (s) => s && !s.trim().startsWith('<') && s.includes(',');
+
+    const proxies = [
+      { type: 'direto',         timeout: 10000, url: () => csvTarget,                                                                 extract: async (r) => r.text() },
+      { type: 'allorigins-raw', timeout: 20000, url: () => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(csvTarget),    extract: async (r) => r.text() },
+      { type: 'allorigins-get', timeout: 20000, url: () => 'https://api.allorigins.win/get?url=' + encodeURIComponent(csvTarget),    extract: async (r) => { const j = await r.json(); return j.contents; } },
+      { type: 'corsproxy',      timeout: 20000, url: () => 'https://corsproxy.io/?' + encodeURIComponent(csvTarget),                extract: async (r) => r.text() },
+      { type: 'thingproxy',     timeout: 20000, url: () => 'https://thingproxy.freeboard.io/fetch/' + csvTarget,                   extract: async (r) => r.text() },
+    ];
+
     let text = null;
     let lastErr = '';
     for (const proxy of proxies) {
       try {
-        const res = await fetchWithTimeout(proxy.url(), 8000);
-        if (!res.ok) { lastErr = `HTTP ${res.status} via ${proxy.type}`; continue; }
+        const res = await fetchWithTimeout(proxy.url(), proxy.timeout);
+        if (!res.ok) { lastErr = 'HTTP ' + res.status + ' via ' + proxy.type; continue; }
         const content = await proxy.extract(res);
-        if (content && !content.trim().startsWith('<') && content.includes(',')) {
-          text = content;
-          break;
-        }
-      } catch (e) { lastErr = e.message; continue; }
+        if (isValidCSV(content)) { text = content; break; }
+        lastErr = 'resposta invalida via ' + proxy.type;
+      } catch (e) { lastErr = proxy.type + ': ' + e.message; continue; }
     }
 
-    if (!text) throw new Error(`Não foi possível buscar o CSV (${lastErr}). Verifique se a planilha está publicada publicamente.`);
+    if (!text) throw new Error('Nao foi possivel buscar o CSV (' + lastErr + '). Verifique se a planilha esta publicada publicamente.');
 
     const parsed = parseCSV(text);
     if (!parsed || parsed.length === 0) throw new Error('CSV vazio ou sem dados válidos.');
