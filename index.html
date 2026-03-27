@@ -875,7 +875,8 @@ function buildUI() {
     document.getElementById(id)?.addEventListener('change', () => { applyFilters(); updateUI(); });
   });
 
-  updateUI();
+  // Aguarda o navegador processar o novo innerHTML antes de popular os elementos
+  setTimeout(updateUI, 50);
 }
 
 // Atualiza KPIs, tabela, gráficos e insights com os dados filtrados
