@@ -601,11 +601,46 @@ async function loadData() {
   btn.classList.add('loading');
 
   try {
-    // Anti-cache: adiciona timestamp na URL
-    const url = `${CSV_URL}&_t=${Date.now()}`;
-    const res  = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
+    // Tenta múltiplos proxies em sequência para contornar CORS no Google Sites
+    const csvTarget = CSV_URL + '&_t=' + Date.now();
+    const proxies = [
+      {
+        type: 'allorigins',
+        url: () => `https://api.allorigins.win/get?url=${encodeURIComponent(csvTarget)}`,
+        extract: async (res) => { const j = await res.json(); return j.contents; }
+      },
+      {
+        type: 'corsproxy',
+        url: () => `https://corsproxy.io/?${encodeURIComponent(csvTarget)}`,
+        extract: async (res) => res.text()
+      },
+      {
+        type: 'jsonp-allorigins',
+        url: () => `https://api.allorigins.win/raw?url=${encodeURIComponent(csvTarget)}`,
+        extract: async (res) => res.text()
+      }
+    ];
+
+    const fetchWithTimeout = (url, ms) => Promise.race([
+      fetch(url),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
+    ]);
+
+    let text = null;
+    let lastErr = '';
+    for (const proxy of proxies) {
+      try {
+        const res = await fetchWithTimeout(proxy.url(), 8000);
+        if (!res.ok) { lastErr = `HTTP ${res.status} via ${proxy.type}`; continue; }
+        const content = await proxy.extract(res);
+        if (content && !content.trim().startsWith('<') && content.includes(',')) {
+          text = content;
+          break;
+        }
+      } catch (e) { lastErr = e.message; continue; }
+    }
+
+    if (!text) throw new Error(`Não foi possível buscar o CSV (${lastErr}). Verifique se a planilha está publicada publicamente.`);
 
     const parsed = parseCSV(text);
     if (!parsed || parsed.length === 0) throw new Error('CSV vazio ou sem dados válidos.');
@@ -1059,7 +1094,9 @@ function renderEfetividade() {
 
   const color = pct => pct >= 60 ? 'var(--green)' : pct >= 30 ? 'var(--amber)' : 'var(--red)';
 
-  document.getElementById('efetTable').innerHTML = `
+  const efetTable = document.getElementById('efetTable');
+  if (!efetTable) return;
+  efetTable.innerHTML = `
     <thead>
       <tr>
         <th>Vendedor</th>
@@ -1263,7 +1300,9 @@ function renderInsights() {
     } : null,
   ].filter(Boolean);
 
-  document.getElementById('insightsGrid').innerHTML = items.map(it => {
+  const insightsGrid = document.getElementById('insightsGrid');
+  if (!insightsGrid) return;
+  insightsGrid.innerHTML = items.map(it => {
     if (it.value === '__TOP5__') {
       const rows = it.top5.map((p, i) => `
         <div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);last-child{border:none}">
@@ -1298,7 +1337,9 @@ function renderInsights() {
 // ESTADO DE ERRO
 // =============================================
 function showError(msg) {
-  document.getElementById('mainContent').innerHTML = `
+  const mc = document.getElementById('mainContent');
+  if (!mc) { console.error('showError:', msg); return; }
+  mc.innerHTML = `
     <div class="state-overlay">
       <span class="err-icon">⚠️</span>
       <h3>Não foi possível carregar os dados</h3>
