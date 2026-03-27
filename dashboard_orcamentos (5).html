@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de Orçamentos</title>
+
+<!-- Chart.js via CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<!-- Google Fonts: Syne (display) + DM Sans (corpo) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* =============================================
+   VARIÁVEIS GLOBAIS E RESET
+   ============================================= */
+:root {
+  --bg:          #F4F5F7;
+  --surface:     #FFFFFF;
+  --surface2:    #F9FAFB;
+  --border:      #E5E7EB;
+  --text-strong: #0D1117;
+  --text-main:   #374151;
+  --text-muted:  #9CA3AF;
+  --accent:      #1A56DB;
+  --accent-soft: #EBF0FF;
+  --green:       #059669;
+  --green-soft:  #D1FAE5;
+  --amber:       #D97706;
+  --amber-soft:  #FEF3C7;
+  --red:         #DC2626;
+  --red-soft:    #FEE2E2;
+  --radius:      12px;
+  --radius-sm:   8px;
+  --shadow:      0 1px 3px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.05);
+  --shadow-md:   0 4px 24px rgba(0,0,0,.09);
+  --font-display:'Syne', sans-serif;
+  --font-body:   'DM Sans', sans-serif;
+  --transition:  .2s ease;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text-main);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* =============================================
+   TOPBAR
+   ============================================= */
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 0 var(--border);
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-brand .dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.topbar-brand h1 {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: -.3px;
+}
+
+.topbar-brand span {
+  font-size: .75rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.last-update {
+  font-size: .75rem;
+  color: var(--text-muted);
+}
+
+.last-update strong { color: var(--text-main); }
+
+/* Botão Atualizar */
+.btn-refresh {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  font-family: var(--font-body);
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  letter-spacing: .2px;
+}
+
+.btn-refresh:hover { background: #1648c0; transform: translateY(-1px); }
+.btn-refresh:active { transform: translateY(0); }
+
+.btn-refresh svg { transition: transform .5s ease; }
+.btn-refresh.loading svg { animation: spin .7s linear infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* =============================================
+   LAYOUT PRINCIPAL
+   ============================================= */
+.main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 28px 32px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* =============================================
+   FILTROS
+   ============================================= */
+.filters-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  box-shadow: var(--shadow);
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 160px;
+}
+
+.filter-group label {
+  font-size: .72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--text-muted);
+}
+
+.filter-group select,
+.filter-group input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-family: var(--font-body);
+  font-size: .85rem;
+  color: var(--text-main);
+  transition: var(--transition);
+  outline: none;
+  cursor: pointer;
+}
+
+.filter-group select:focus,
+.filter-group input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.btn-clear {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  font-family: var(--font-body);
+  font-size: .82rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+  align-self: flex-end;
+  height: 37px;
+}
+
+.btn-clear:hover { color: var(--text-main); border-color: var(--text-muted); }
+
+/* =============================================
+   SEÇÃO DE TÍTULO
+   ============================================= */
+.section-title {
+  font-family: var(--font-display);
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: -8px;
+}
+
+/* =============================================
+   GRADE DE KPIs
+   ============================================= */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--kpi-color, var(--accent));
+}
+
+.kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+
+.kpi-label {
+  font-size: .72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--text-muted);
+}
+
+.kpi-value {
+  font-family: var(--font-display);
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: var(--text-strong);
+  line-height: 1;
+  letter-spacing: -.5px;
+  word-break: break-all;
+}
+
+.kpi-sub {
+  font-size: .78rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.kpi-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: .72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  width: fit-content;
+}
+
+/* =============================================
+   EFETIVIDADE POR VENDEDOR
+   ============================================= */
+.efectividade-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+.efectividade-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.efectividade-header h2 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.efectividade-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.efectividade-table th {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--text-muted);
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.efectividade-table td {
+  padding: 10px 12px;
+  font-size: .85rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-main);
+}
+
+.efectividade-table tr:last-child td { border-bottom: none; }
+.efectividade-table tr:hover td { background: var(--surface2); }
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-bar-bg {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+  transition: width .6s cubic-bezier(.4,0,.2,1);
+}
+
+.pct-label {
+  font-family: var(--font-display);
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--text-strong);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* =============================================
+   GRADE DE GRÁFICOS
+   ============================================= */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .charts-grid { grid-template-columns: 1fr; }
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+.chart-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.chart-card-header h2 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.chart-card-header p {
+  font-size: .75rem;
+  color: var(--text-muted);
+}
+
+.chart-wrap { position: relative; height: 280px; }
+
+/* =============================================
+   INSIGHTS
+   ============================================= */
+.insights-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+.insights-card h2 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-strong);
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.insights-card h2 .icon {
+  width: 28px; height: 28px;
+  background: var(--accent-soft);
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.insight-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.insight-item .i-icon {
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.insight-item .i-content {}
+.insight-item .i-label {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+
+.insight-item .i-value {
+  font-size: .92rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 1.3;
+}
+
+.insight-item .i-sub {
+  font-size: .75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* =============================================
+   ESTADO DE LOADING / ERRO
+   ============================================= */
+.state-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.state-overlay .spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+
+.state-overlay p {
+  font-size: .9rem;
+  color: var(--text-muted);
+}
+
+.state-overlay .err-icon { font-size: 2rem; }
+.state-overlay h3 { font-size: 1rem; font-weight: 600; color: var(--text-strong); }
+
+/* =============================================
+   RESPONSIVIDADE
+   ============================================= */
+@media (max-width: 700px) {
+  .main { padding: 16px; gap: 16px; }
+  .topbar { padding: 0 16px; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- =============================================
+     TOPBAR
+     ============================================= -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <div class="dot"></div>
+    <h1>Orçamentos <span>/ Analytics</span></h1>
+  </div>
+  <div class="topbar-right">
+    <span class="last-update" id="lastUpdate">Carregando...</span>
+    <button class="btn-refresh" id="btnRefresh" onclick="loadData()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+        <path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+        <path d="M8 16H3v5"/>
+      </svg>
+      Atualizar dados
+    </button>
+  </div>
+</header>
+
+<!-- =============================================
+     CONTEÚDO PRINCIPAL
+     ============================================= -->
+<main class="main" id="mainContent">
+  <!-- Estado inicial de loading -->
+  <div class="state-overlay" id="loadingState">
+    <div class="spinner"></div>
+    <p>Carregando dados do CSV...</p>
+  </div>
+</main>
+
+<script>
+// =============================================
+// ⚙️  CONFIGURAÇÃO — ALTERE O LINK DO CSV AQUI
+// =============================================
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSXKnSHflC7bW2VSZc47tqC7V5AAqLZ5UL0cmtvUxv9vzlKctYFw8LdWthma-bi8SCDIOzekvDqVFD9/pub?gid=0&single=true&output=csv";
+// =============================================
+
+// Estado global dos dados e filtros
+let allData      = [];   // todos os orçamentos únicos (por NUM ORC.)
+let allRaw       = [];   // todas as linhas brutas
+let filteredData = [];   // orçamentos após filtros
+let charts       = {};   // instâncias Chart.js
+
+// =============================================
+// INICIALIZAÇÃO
+// =============================================
+document.addEventListener('DOMContentLoaded', loadData);
+
+// =============================================
+// CARGA E PARSE DO CSV
+// =============================================
+async function loadData() {
+  const btn = document.getElementById('btnRefresh');
+  btn.classList.add('loading');
+
+  try {
+    // Anti-cache: adiciona timestamp na URL
+    const url = `${CSV_URL}&_t=${Date.now()}`;
+    const res  = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+
+    const parsed = parseCSV(text);
+    if (!parsed || parsed.length === 0) throw new Error('CSV vazio ou sem dados válidos.');
+
+    allRaw  = parsed;
+    allData = deduplicateByOrc(parsed);
+
+    renderAll();
+    document.getElementById('lastUpdate').innerHTML =
+      `Atualizado: <strong>${new Date().toLocaleString('pt-BR')}</strong>`;
+
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    btn.classList.remove('loading');
+  }
+}
+
+// =============================================
+// PARSE CSV — detecta separador, normaliza cabeçalhos
+// =============================================
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) throw new Error('CSV não possui linhas suficientes.');
+
+  // Detecta separador: ponto e vírgula ou vírgula
+  const sep = (lines[0].split(';').length > lines[0].split(',').length) ? ';' : ',';
+
+  // Normaliza cabeçalho: uppercase, sem espaços extras
+  const rawHeaders = lines[0].split(sep).map(h => normalizeKey(h));
+
+  // Colunas obrigatórias (normalizadas)
+  const required = ['NUMORC','CODSTATUS','DESCSTATUS','NOMEVENDEDOR','CODVENDEDOR',
+                    'DTEMISSAO','VALORTOAL','DESCPRODUTOS','GRUPOPRODUTOS'];
+  // Mapeia nomes flexíveis
+  const colMap = buildColMap(rawHeaders);
+
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = splitLine(lines[i], sep);
+    if (cols.length < 3) continue; // linha inválida
+
+    const row = {};
+    rawHeaders.forEach((h, idx) => { row[h] = (cols[idx] || '').trim(); });
+
+    // Converte tipos
+    row._numOrc   = String(col(row, colMap, 'NUMORC')).trim();
+    row._status   = String(col(row, colMap, 'CODSTATUS')).trim().toUpperCase();
+    row._descSts  = String(col(row, colMap, 'DESCSTATUS')).trim();
+    row._vendedor = String(col(row, colMap, 'NOMEVENDEDOR')).trim();
+    row._codVend  = String(col(row, colMap, 'CODVENDEDOR')).trim();
+    row._produto  = String(col(row, colMap, 'DESCPRODUTOS')).trim();
+    row._codProd  = String(col(row, colMap, 'CODPRODUTOS')).trim();
+    row._grupo    = String(col(row, colMap, 'GRUPOPRODUTOS')).trim();
+    row._motivo   = String(col(row, colMap, 'DESCMOTIVO')).trim();
+    row._filial   = String(col(row, colMap, 'FILIAL')).trim();
+    row._ano      = String(col(row, colMap, 'ANO')).trim();
+    row._mes      = String(col(row, colMap, 'MES')).trim();
+    row._valor    = parseBRNumber(String(col(row, colMap, 'VALORTOTAL')));
+    row._qtde     = parseBRNumber(String(col(row, colMap, 'QTDEDOITEM')));
+    row._dtEmissao = parseDate(col(row, colMap, 'DTÉMISSAO') || col(row, colMap, 'DTEMISSAO'));
+
+    if (!row._numOrc) continue;
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+// Converte número brasileiro (1.234.567,89) ou americano (1234567.89) para float
+function parseBRNumber(str) {
+  if (!str || str.trim() === '') return 0;
+  str = str.trim();
+  // Remove espaços e símbolo de moeda
+  str = str.replace(/[R$\s]/g, '');
+  // Detecta formato: se tem vírgula, trata como BR (ponto=milhar, vírgula=decimal)
+  if (str.includes(',')) {
+    str = str.replace(/\./g, '').replace(',', '.');
+  }
+  // Se só tem ponto, já está no formato americano — usa direto
+  const val = parseFloat(str);
+  return isNaN(val) ? 0 : val;
+}
+
+// Normaliza chave de coluna: uppercase, sem acentos, sem espaços, sem pontos
+function normalizeKey(str) {
+  return str.trim()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+// Mapeia colunas do CSV para chaves canônicas
+function buildColMap(headers) {
+  const map = {};
+  const synonyms = {
+    'NUMORC':       ['NUMORC','NUMEROORCAMENTO','NUMORCAMENTO','NUMORC'],
+    'CODSTATUS':    ['CODSTATUS','CODSTATUS','STATUS'],
+    'DESCSTATUS':   ['DESCSTATUS','DESCRICAOSTATUS','STATUSDESC'],
+    'NOMEVENDEDOR': ['NOMEVENDEDOR','VENDEDOR','NOME'],
+    'CODVENDEDOR':  ['CODVENDEDOR','CODIGOVENDEDOR'],
+    'CODPRODUTOS':  ['CODPRODUTOS','CODPRODUTO','CODIGOPRODUTO','CODPROD'],
+    'DESCPRODUTOS': ['DESCPRODUTOS','DESCRICAOPRODUTOS','PRODUTO','DESCPRODUTO'],
+    'GRUPOPRODUTOS':['GRUPOPRODUTOS','GRUPO','GRUPOPRODUTO'],
+    'DESCMOTIVO':   ['DESCMOTIVO','DESCRICAOMOTIVO','MOTIVO'],
+    'FILIAL':       ['FILIAL'],
+    'ANO':          ['ANO'],
+    'MES':          ['MES','MS'],
+    'VALORTOTAL':   ['VALORTOTAL','VALOR','TOTAL'],
+    'QTDEDOITEM':   ['QTDEDOITEM','QTDE','QUANTIDADE'],
+    'DTEMISSAO':    ['DTEMISSAO','DTÉMISSAO','DATAEMISSAO','DATAORCAMENTO'],
+  };
+  for (const [canon, alts] of Object.entries(synonyms)) {
+    for (const alt of alts) {
+      const found = headers.find(h => h === alt || h.startsWith(alt));
+      if (found) { map[canon] = found; break; }
+    }
+    if (!map[canon]) map[canon] = headers.find(h => h.includes(canon.slice(0,6))) || canon;
+  }
+  return map;
+}
+
+function col(row, colMap, key) { return row[colMap[key]] ?? row[key] ?? ''; }
+
+// Splitta uma linha CSV respeitando aspas
+function splitLine(line, sep) {
+  const result = []; let cur = ''; let inQ = false;
+  for (const c of line) {
+    if (c === '"') { inQ = !inQ; }
+    else if (c === sep && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+// Converte string de data para objeto Date
+function parseDate(str) {
+  if (!str) return null;
+  str = String(str).trim();
+  // dd/mm/yyyy ou dd-mm-yyyy
+  const m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (m) {
+    const y = m[3].length === 2 ? '20' + m[3] : m[3];
+    return new Date(`${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`);
+  }
+  const d = new Date(str);
+  return isNaN(d) ? null : d;
+}
+
+// Deduplica por número de orçamento (mantém a 1ª ocorrência para status/vendedor)
+function deduplicateByOrc(rows) {
+  const map = new Map();
+  for (const row of rows) {
+    if (!map.has(row._numOrc)) map.set(row._numOrc, row);
+  }
+  return [...map.values()];
+}
+
+// =============================================
+// RENDERIZAÇÃO COMPLETA
+// =============================================
+function renderAll() {
+  applyFilters();
+  buildUI();
+}
+
+// Aplica filtros aos dados únicos por orçamento
+function applyFilters() {
+  const fAno     = document.getElementById('fAno')?.value     || '';
+  const fMes     = document.getElementById('fMes')?.value     || '';
+  const fDia     = document.getElementById('fDia')?.value     || '';
+  const vendedor = document.getElementById('fVendedor')?.value || '';
+  const motivo   = document.getElementById('fMotivo')?.value   || '';
+  const status   = document.getElementById('fStatus')?.value   || '';
+
+  filteredData = allData.filter(r => {
+    if (vendedor && r._vendedor !== vendedor) return false;
+    if (motivo   && r._motivo   !== motivo)   return false;
+    if (status   && r._descSts  !== status)   return false;
+    if (fAno && r._ano !== fAno) return false;
+    if (fMes && r._mes.padStart(2,'0') !== fMes.padStart(2,'0')) return false;
+    if (fDia) {
+      if (!r._dtEmissao) return false;
+      const dia = String(r._dtEmissao.getDate()).padStart(2,'0');
+      if (dia !== fDia.padStart(2,'0')) return false;
+    }
+    return true;
+  });
+}
+
+// Constrói toda a UI após dados carregados
+function buildUI() {
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `
+    <p class="section-title">Filtros</p>
+    ${buildFilters()}
+    <p class="section-title">Visão Geral</p>
+    <div class="kpi-grid" id="kpiGrid"></div>
+    <p class="section-title">Efetividade por Vendedor</p>
+    <div class="efectividade-section">
+      <div class="efectividade-header">
+        <h2>Efetividade por Vendedor</h2>
+        <span style="font-size:.75rem;color:var(--text-muted)">Status B = Orçamento Baixado (Venda)</span>
+      </div>
+      <table class="efectividade-table" id="efetTable"></table>
+    </div>
+    <p class="section-title">Evolução e Distribuição</p>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div><h2>Orçamentos por Mês</h2><p>Histórico de volume</p></div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartLinha"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div><h2>Orçamentos por Vendedor</h2><p>Quantidade total</p></div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartBarras"></canvas></div>
+      </div>
+    </div>
+    <p class="section-title">Insights Automáticos</p>
+    <div class="insights-card">
+      <h2><span class="icon">💡</span> Análise Executiva</h2>
+      <div class="insights-grid" id="insightsGrid"></div>
+    </div>
+  `;
+
+  // Re-associa eventos dos filtros
+  ['fAno','fMes','fDia','fVendedor','fMotivo','fStatus'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => { applyFilters(); updateUI(); });
+  });
+
+  updateUI();
+}
+
+// Atualiza KPIs, tabela, gráficos e insights com os dados filtrados
+function updateUI() {
+  renderKPIs();
+  renderEfetividade();
+  renderCharts();
+  renderInsights();
+}
+
+// =============================================
+// FILTROS — HTML
+// =============================================
+function buildFilters() {
+  const anos      = [...new Set(allData.map(r => r._ano).filter(Boolean))].sort();
+  // Ordena meses na ordem do calendário (01=Jan … 12=Dez)
+  const meses     = [...new Set(allData.map(r => r._mes ? r._mes.padStart(2,'0') : '').filter(Boolean))]
+                      .sort((a,b) => parseInt(a) - parseInt(b));
+  const dias      = [...new Set(allData.map(r => {
+    if (!r._dtEmissao) return '';
+    return String(r._dtEmissao.getDate()).padStart(2,'0');
+  }).filter(Boolean))].sort();
+  const vendedores= [...new Set(allData.map(r => r._vendedor).filter(Boolean))].sort();
+  const motivos   = [...new Set(allData.map(r => r._motivo).filter(Boolean))].sort();
+  const statusList= [...new Set(allData.map(r => r._descSts).filter(Boolean))].sort();
+
+  const MESES_NOME = {'01':'Janeiro','02':'Fevereiro','03':'Março','04':'Abril',
+    '05':'Maio','06':'Junho','07':'Julho','08':'Agosto',
+    '09':'Setembro','10':'Outubro','11':'Novembro','12':'Dezembro'};
+
+  const opt  = (val, label) => `<option value="${val}">${label}</option>`;
+  const opts  = (arr) => arr.map(v => opt(v, v)).join('');
+  const optsM = (arr) => arr.map(v => opt(v, MESES_NOME[v] || v)).join('');
+
+  return `
+  <div class="filters-bar">
+    <div class="filter-group">
+      <label>Ano</label>
+      <select id="fAno">
+        <option value="">Todos</option>
+        ${opts(anos)}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Mês</label>
+      <select id="fMes">
+        <option value="">Todos</option>
+        ${optsM(meses)}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Dia</label>
+      <select id="fDia">
+        <option value="">Todos</option>
+        ${opts(dias)}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Vendedor</label>
+      <select id="fVendedor">
+        <option value="">Todos</option>
+        ${opts(vendedores)}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Motivo</label>
+      <select id="fMotivo">
+        <option value="">Todos</option>
+        ${opts(motivos)}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Status</label>
+      <select id="fStatus">
+        <option value="">Todos</option>
+        ${opts(statusList)}
+      </select>
+    </div>
+    <button class="btn-clear" onclick="clearFilters()">Limpar filtros</button>
+  </div>`;
+}
+
+function clearFilters() {
+  ['fAno','fMes','fDia','fVendedor','fMotivo','fStatus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  applyFilters();
+  updateUI();
+}
+
+// =============================================
+// KPIs
+// =============================================
+function renderKPIs() {
+  const total     = filteredData.length;
+  const baixados  = filteredData.filter(r => r._status === 'B').length;
+  const abertos   = filteredData.filter(r => r._status === 'A').length;
+  const cancelados= filteredData.filter(r => !['B','A'].includes(r._status)).length;
+  const efetiv    = total > 0 ? ((baixados / total) * 100).toFixed(1) : '0.0';
+
+  // Valor total: soma VALOR TOTAL direto no allRaw com os mesmos filtros aplicados
+  const fAno_kpi     = document.getElementById('fAno')?.value     || '';
+  const fMes_kpi     = document.getElementById('fMes')?.value     || '';
+  const fDia_kpi     = document.getElementById('fDia')?.value     || '';
+  const fVend_kpi    = document.getElementById('fVendedor')?.value || '';
+  const fMot_kpi     = document.getElementById('fMotivo')?.value   || '';
+  const fSts_kpi     = document.getElementById('fStatus')?.value   || '';
+
+  const valorTotal = allRaw.filter(r => {
+    if (fAno_kpi  && r._ano !== fAno_kpi) return false;
+    if (fMes_kpi  && r._mes.padStart(2,'0') !== fMes_kpi.padStart(2,'0')) return false;
+    if (fDia_kpi) {
+      if (!r._dtEmissao) return false;
+      const dia = String(r._dtEmissao.getDate()).padStart(2,'0');
+      if (dia !== fDia_kpi.padStart(2,'0')) return false;
+    }
+    if (fVend_kpi && r._vendedor !== fVend_kpi) return false;
+    if (fMot_kpi  && r._motivo   !== fMot_kpi)  return false;
+    if (fSts_kpi  && r._descSts  !== fSts_kpi)  return false;
+    return true;
+  }).reduce((s, r) => s + (r._valor || 0), 0);
+
+  const fmt = n => n.toLocaleString('pt-BR', {minimumFractionDigits:0, maximumFractionDigits:0});
+  const fmtR = n => 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  document.getElementById('valorBanner').innerHTML = `
+    <div class="valor-banner">
+      <div class="valor-banner-left">
+        <div class="valor-banner-label">Valor Total dos Orçamentos</div>
+        <div class="valor-banner-value">${fmtR(valorTotal)}</div>
+        <div class="valor-banner-sub">soma da coluna Valor Total · filtro aplicado</div>
+      </div>
+      <div class="valor-banner-right">
+        <div class="valor-banner-stat">
+          <div class="valor-banner-stat-label">Total Orç.</div>
+          <div class="valor-banner-stat-value">${fmt(total)}</div>
+        </div>
+        <div class="valor-banner-stat">
+          <div class="valor-banner-stat-label">Baixados</div>
+          <div class="valor-banner-stat-value">${fmt(baixados)}</div>
+        </div>
+        <div class="valor-banner-stat">
+          <div class="valor-banner-stat-label">Em Aberto</div>
+          <div class="valor-banner-stat-value">${fmt(abertos)}</div>
+        </div>
+        <div class="valor-banner-stat">
+          <div class="valor-banner-stat-label">Cancelados</div>
+          <div class="valor-banner-stat-value">${fmt(cancelados)}</div>
+        </div>
+        <div class="valor-banner-stat">
+          <div class="valor-banner-stat-label">Efetividade</div>
+          <div class="valor-banner-stat-value">${efetiv}%</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('kpiGrid').innerHTML = `
+    ${kpiCard('Total de Orçamentos', fmt(total), 'orçamentos únicos', null, '#1A56DB')}
+    ${kpiCard('Baixados (Vendas)', fmt(baixados), 'orçamentos convertidos', badgeGreen(efetiv+'% efetividade'), '#059669')}
+    ${kpiCard('Em Aberto', fmt(abertos), 'em negociação', null, '#D97706')}
+    ${kpiCard('Cancelados', fmt(cancelados), 'recusados', null, '#DC2626')}
+  `;
+}
+
+function kpiCard(label, value, sub, badge, color) {
+  return `
+  <div class="kpi-card" style="--kpi-color:${color}">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value">${value}</div>
+    <div class="kpi-sub">${sub}</div>
+    ${badge ? badge : ''}
+  </div>`;
+}
+
+function badgeGreen(txt) {
+  return `<span class="kpi-badge" style="background:var(--green-soft);color:var(--green)">✓ ${txt}</span>`;
+}
+
+// =============================================
+// EFETIVIDADE POR VENDEDOR
+// =============================================
+function renderEfetividade() {
+  // Usa allData inteiro (sem filtro de vendedor para mostrar todos), mas respeita período/motivo/status
+  const fAno   = document.getElementById('fAno')?.value   || '';
+  const fMes   = document.getElementById('fMes')?.value   || '';
+  const fDia   = document.getElementById('fDia')?.value   || '';
+  const motivo = document.getElementById('fMotivo')?.value || '';
+  const status = document.getElementById('fStatus')?.value || '';
+
+  const base = allData.filter(r => {
+    if (motivo && r._motivo !== motivo) return false;
+    if (status && r._descSts !== status) return false;
+    if (fAno && r._ano !== fAno) return false;
+    if (fMes && r._mes.padStart(2,'0') !== fMes.padStart(2,'0')) return false;
+    if (fDia) {
+      if (!r._dtEmissao) return false;
+      const dia = String(r._dtEmissao.getDate()).padStart(2,'0');
+      if (dia !== fDia.padStart(2,'0')) return false;
+    }
+    return true;
+  });
+
+  const vMap = {};
+  for (const r of base) {
+    if (!r._vendedor) continue;
+    if (!vMap[r._vendedor]) vMap[r._vendedor] = { total: 0, baixados: 0 };
+    vMap[r._vendedor].total++;
+    if (r._status === 'B') vMap[r._vendedor].baixados++;
+  }
+
+  const rows = Object.entries(vMap)
+    .map(([v, d]) => ({ vendedor: v, total: d.total, baixados: d.baixados, pct: d.total > 0 ? (d.baixados/d.total)*100 : 0 }))
+    .sort((a, b) => b.pct - a.pct);
+
+  const color = pct => pct >= 60 ? 'var(--green)' : pct >= 30 ? 'var(--amber)' : 'var(--red)';
+
+  document.getElementById('efetTable').innerHTML = `
+    <thead>
+      <tr>
+        <th>Vendedor</th>
+        <th style="text-align:right">Total Orç.</th>
+        <th style="text-align:right">Baixados</th>
+        <th style="min-width:200px">Efetividade</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.map(r => `
+        <tr>
+          <td><strong>${r.vendedor}</strong></td>
+          <td style="text-align:right;color:var(--text-muted)">${r.total}</td>
+          <td style="text-align:right;color:var(--green)">${r.baixados}</td>
+          <td>
+            <div class="progress-wrap">
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width:${r.pct.toFixed(1)}%;background:${color(r.pct)}"></div>
+              </div>
+              <span class="pct-label" style="color:${color(r.pct)}">${r.pct.toFixed(1)}%</span>
+            </div>
+          </td>
+        </tr>
+      `).join('')}
+    </tbody>
+  `;
+}
+
+// =============================================
+// GRÁFICOS (Chart.js)
+// =============================================
+function renderCharts() {
+  renderChartLinha();
+  renderChartBarras();
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+// Gráfico de linha: orçamentos por mês
+function renderChartLinha() {
+  destroyChart('linha');
+
+  // Agrupa por ano-mês
+  const map = {};
+  for (const r of filteredData) {
+    const key = r._ano && r._mes ? `${r._ano}-${r._mes.padStart(2,'0')}` : 'Sem data';
+    map[key] = (map[key] || 0) + 1;
+  }
+  const labels = Object.keys(map).sort();
+  const data   = labels.map(k => map[k]);
+
+  const ctx = document.getElementById('chartLinha').getContext('2d');
+  charts['linha'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Orçamentos',
+        data,
+        borderColor: '#1A56DB',
+        backgroundColor: 'rgba(26,86,219,.08)',
+        borderWidth: 2.5,
+        pointBackgroundColor: '#1A56DB',
+        pointRadius: 4,
+        fill: true,
+        tension: .35,
+      }]
+    },
+    options: chartOptions('Qtd. Orçamentos')
+  });
+}
+
+// Gráfico de barras: orçamentos por vendedor
+function renderChartBarras() {
+  destroyChart('barras');
+
+  const map = {};
+  for (const r of filteredData) {
+    if (!r._vendedor) continue;
+    map[r._vendedor] = (map[r._vendedor] || 0) + 1;
+  }
+  const sorted = Object.entries(map).sort((a,b) => b[1]-a[1]).slice(0, 15);
+  const labels = sorted.map(e => e[0]);
+  const data   = sorted.map(e => e[1]);
+
+  const palette = ['#1A56DB','#2563EB','#3B82F6','#60A5FA','#93C5FD',
+                   '#1D4ED8','#1E40AF','#1E3A8A','#172554','#BFDBFE'];
+
+  const ctx = document.getElementById('chartBarras').getContext('2d');
+  charts['barras'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Orçamentos',
+        data,
+        backgroundColor: labels.map((_,i) => palette[i % palette.length]),
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      ...chartOptions('Qtd. Orçamentos'),
+      indexAxis: data.length > 6 ? 'y' : 'x',
+    }
+  });
+}
+
+function chartOptions(yLabel) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0D1117',
+        titleColor: '#F9FAFB',
+        bodyColor: '#9CA3AF',
+        padding: 10,
+        cornerRadius: 8,
+      }
+    },
+    scales: {
+      x: { grid: { color: '#F3F4F6' }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#9CA3AF' } },
+      y: { grid: { color: '#F3F4F6' }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#9CA3AF' }, title: { display: false } }
+    }
+  };
+}
+
+// =============================================
+// INSIGHTS AUTOMÁTICOS
+// =============================================
+function renderInsights() {
+  // 1. Vendedor com maior efetividade
+  const vMap = {};
+  for (const r of filteredData) {
+    if (!r._vendedor) continue;
+    if (!vMap[r._vendedor]) vMap[r._vendedor] = { total: 0, baixados: 0 };
+    vMap[r._vendedor].total++;
+    if (r._status === 'B') vMap[r._vendedor].baixados++;
+  }
+  const vendRows = Object.entries(vMap)
+    .filter(([,d]) => d.total >= 3) // mínimo de 3 para ser relevante
+    .map(([v,d]) => ({ v, pct: (d.baixados/d.total)*100, total: d.total }))
+    .sort((a,b) => b.pct - a.pct);
+
+  const melhor = vendRows[0];
+  const pior   = vendRows[vendRows.length - 1];
+
+  // 2. Top 5 produtos mais orçados — soma QTDE DO ITEM das linhas brutas filtradas
+  const orcsFiltrados = new Set(filteredData.map(r => r._numOrc));
+  const prodMap = {};
+  for (const r of allRaw) {
+    if (!orcsFiltrados.has(r._numOrc) || !r._produto) continue;
+    const key = r._produto;
+    if (!prodMap[key]) prodMap[key] = { qtde: 0, cod: r._codProd || '' };
+    prodMap[key].qtde += (r._qtde || 0);
+    if (!prodMap[key].cod && r._codProd) prodMap[key].cod = r._codProd;
+  }
+  const topProd = Object.entries(prodMap)
+    .map(([desc, d]) => ({ desc, cod: d.cod, count: d.qtde }))
+    .sort((a,b) => b.count - a.count)
+    .slice(0, 5);
+
+  // 3. Principal motivo de cancelamento
+  const motivoMap = {};
+  for (const r of filteredData) {
+    if (r._status !== 'A' && !['B'].includes(r._status) && r._motivo) {
+      motivoMap[r._motivo] = (motivoMap[r._motivo] || 0) + 1;
+    }
+  }
+  const topMotivo = Object.entries(motivoMap).sort((a,b) => b[1]-a[1])[0];
+
+  const items = [
+    melhor ? {
+      icon: '🏆', bg: '#D1FAE5', color: '#059669',
+      label: 'Maior Efetividade',
+      value: melhor.v,
+      sub: `${melhor.pct.toFixed(1)}% de conversão (${melhor.total} orç.)`
+    } : null,
+    pior && pior !== melhor ? {
+      icon: '⚠️', bg: '#FEE2E2', color: '#DC2626',
+      label: 'Menor Efetividade',
+      value: pior.v,
+      sub: `${pior.pct.toFixed(1)}% de conversão (${pior.total} orç.)`
+    } : null,
+    topProd.length > 0 ? {
+      icon: '📦', bg: '#EBF0FF', color: '#1A56DB',
+      label: 'Top 5 Produtos Mais Orçados',
+      value: '__TOP5__',
+      sub: '',
+      top5: topProd
+    } : null,
+    topMotivo ? {
+      icon: '❌', bg: '#FEF3C7', color: '#D97706',
+      label: 'Principal Motivo de Cancelamento',
+      value: topMotivo[0],
+      sub: `${topMotivo[1]} orçamentos`
+    } : null,
+  ].filter(Boolean);
+
+  document.getElementById('insightsGrid').innerHTML = items.map(it => {
+    if (it.value === '__TOP5__') {
+      const rows = it.top5.map((p, i) => `
+        <div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);last-child{border:none}">
+          <span style="font-family:var(--font-display);font-size:.75rem;font-weight:800;color:var(--accent);min-width:18px">${i+1}.</span>
+          <div>
+            <div style="font-size:.8rem;font-weight:600;color:var(--text-strong);line-height:1.3">${p.desc.length>45?p.desc.slice(0,45)+'…':p.desc}</div>
+            <div style="font-size:.72rem;color:var(--text-muted)">Cód: ${p.cod || '—'} &nbsp;·&nbsp; ${p.count.toLocaleString('pt-BR')} un.</div>
+          </div>
+        </div>`).join('');
+      return `
+        <div class="insight-item" style="flex-direction:column;gap:10px;grid-column:span 2">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="i-icon" style="background:${it.bg};color:${it.color}">${it.icon}</div>
+            <div class="i-label" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)">${it.label}</div>
+          </div>
+          <div style="display:flex;flex-direction:column">${rows}</div>
+        </div>`;
+    }
+    return `
+    <div class="insight-item">
+      <div class="i-icon" style="background:${it.bg};color:${it.color}">${it.icon}</div>
+      <div class="i-content">
+        <div class="i-label">${it.label}</div>
+        <div class="i-value">${it.value}</div>
+        <div class="i-sub">${it.sub}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// =============================================
+// ESTADO DE ERRO
+// =============================================
+function showError(msg) {
+  document.getElementById('mainContent').innerHTML = `
+    <div class="state-overlay">
+      <span class="err-icon">⚠️</span>
+      <h3>Não foi possível carregar os dados</h3>
+      <p>${msg}</p>
+      <p style="font-size:.8rem;max-width:420px;color:var(--text-muted)">
+        Verifique se o link do CSV está correto e público, ou se o Google Drive ainda está sincronizando o arquivo.
+      </p>
+      <button class="btn-refresh" onclick="loadData()" style="margin-top:8px">
+        Tentar novamente
+      </button>
+    </div>`;
+}
+</script>
+</body>
+</html>
