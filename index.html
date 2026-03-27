@@ -633,10 +633,17 @@ async function loadData() {
     if (!text) throw new Error('Nao foi possivel buscar o CSV (' + lastErr + '). Verifique se a planilha esta publicada publicamente.');
 
     const parsed = parseCSV(text);
-    if (!parsed || parsed.length === 0) throw new Error('CSV vazio ou sem dados válidos.');
+    if (!parsed || parsed.length === 0) throw new Error('CSV vazio ou sem dados validos. Linhas recebidas: ' + text.split('\n').length);
 
     allRaw  = parsed;
     allData = deduplicateByOrc(parsed);
+
+    if (allData.length === 0) {
+      // Diagnóstico: mostra as primeiras colunas encontradas
+      const sample = parsed[0] ? Object.keys(parsed[0]).filter(k => !k.startsWith('_')).join(' | ') : 'nenhuma';
+      const numOrcSample = parsed.slice(0,3).map(r => r._numOrc).join(', ');
+      throw new Error('Dados carregados (' + parsed.length + ' linhas) mas nenhum orçamento válido encontrado. Colunas: ' + sample + ' | _numOrc amostras: ' + numOrcSample);
+    }
 
     renderAll();
     document.getElementById('lastUpdate').innerHTML =
